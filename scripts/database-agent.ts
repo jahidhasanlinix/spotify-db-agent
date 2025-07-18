@@ -7,7 +7,7 @@ import { GoogleGenerativeAI } from '@google/generative-ai'
 
 // Load environment variables
 config()
-import { db } from '../src/lib/db/index'
+import { db, sqlite } from '../src/lib/db/index'
 import { tracks, recentlyPlayed, madeForYouPlaylists, popularAlbums } from '../src/lib/db/schema'
 import { recentlyPlayedData, madeForYouData, popularAlbumsData } from '../src/components/spotify-main-content'
 import { eq, sql } from 'drizzle-orm'
@@ -39,7 +39,7 @@ class DatabaseAgent {
   }
   
 
-
+  // Orchestrate the database agent:
   async processQuery(userQuery: string): Promise<void> {
     this.context = {
       query: userQuery,
@@ -59,7 +59,7 @@ class DatabaseAgent {
       // Step 3: Create API routes
       await this.createAPIRoutes()
       
-      // Step 4: Update frontend (bonus)
+      // Step 4: Update frontend (placeholder for future integration)
       await this.updateFrontend()
       
       console.log('\n✅ Agent completed successfully!')
@@ -74,7 +74,14 @@ class DatabaseAgent {
     this.logStep('🧠 Analyzing query...')
     
     const prompt = `
-    You are a database agent for a Spotify clone app. Analyze this user query and determine what database operations are needed:
+    You are a database agent for a Spotify clone app. Your job is to:
+    - Analyze user queries and determine what database features are required.
+    - Create database tables if they do not exist (DDL), including generating and running migration scripts as needed.
+    - Populate tables with data (DML) from available sources.
+    - Implement database operations (CRUD).
+    - Set up API endpoints for the frontend to consume.
+    - Integrate new database features into the UI/UX of the site when possible.
+    - Display your current process and reasoning at each step.
 
     Query: "${this.context.query}"
 
@@ -319,15 +326,64 @@ export async function GET() {
     console.log(`\n${this.context.currentStep}. ${step}`)
   }
 
+  // --- Table creation logic ---
+  private async createTableIfNotExists(tableName: string): Promise<void> {
+    try {
+      if (tableName === 'tracks') {
+        sqlite.prepare(`
+          CREATE TABLE IF NOT EXISTS tracks (
+            id TEXT PRIMARY KEY,
+            title TEXT NOT NULL,
+            artist TEXT NOT NULL,
+            album TEXT NOT NULL,
+            albumArt TEXT,
+            duration INTEGER,
+            createdAt TIMESTAMP
+          )
+        `).run()
+      } else if (tableName === 'recently_played') {
+        sqlite.prepare(`
+          CREATE TABLE IF NOT EXISTS recently_played (
+            id TEXT PRIMARY KEY,
+            trackId TEXT NOT NULL,
+            playedAt TIMESTAMP NOT NULL
+          )
+        `).run()
+      } else if (tableName === 'made_for_you_playlists') {
+        sqlite.prepare(`
+          CREATE TABLE IF NOT EXISTS made_for_you_playlists (
+            id TEXT PRIMARY KEY,
+            title TEXT NOT NULL,
+            description TEXT,
+            image TEXT,
+            createdAt TIMESTAMP
+          )
+        `).run()
+      } else if (tableName === 'popular_albums') {
+        sqlite.prepare(`
+          CREATE TABLE IF NOT EXISTS popular_albums (
+            id TEXT PRIMARY KEY,
+            title TEXT NOT NULL,
+            artist TEXT NOT NULL,
+            image TEXT,
+            duration INTEGER,
+            createdAt TIMESTAMP
+          )
+        `).run()
+      }
+      console.log(`   ├─ Table ${tableName} created or already exists`)
+    } catch (error) {
+      console.error(`   ├─ ❌ Error creating table ${tableName}:`, error)
+      throw error
+    }
+  }
 
-
-  // Dynamic table management methods
+  // Dynamic table management methods to ensure the table exists and has data
   private async ensureTableExists(tableName: string): Promise<void> {
     try {
       console.log(`   ├─ Verifying table ${tableName} exists...`)
-      
-      // Tables should exist from schema migration, but check if they have data
       let hasData = false
+      let tableMissing = false
       try {
         if (tableName === 'tracks') {
           const count = await db.select({ count: sql`count(*)` }).from(tracks)
@@ -343,13 +399,16 @@ export async function GET() {
           hasData = (count[0]?.count as number) > 0
         }
       } catch (error) {
-        // Table might not exist, that's okay - schema should have been created
-        console.log(`   ├─ Table ${tableName} not found, it should be created by migrations`)
+        // Table might not exist, so create it
+        tableMissing = true
+        console.log(`   ├─ Table ${tableName} not found, creating...`)
+        await this.createTableIfNotExists(tableName)
       }
-      
-      console.log(`   ├─ ✅ Table ${tableName} is ready ${hasData ? '(has data)' : '(empty)'}`)
+      if (!tableMissing) {
+        console.log(`   ├─ ✅ Table ${tableName} is ready ${hasData ? '(has data)' : '(empty)'}`)
+      }
     } catch (error) {
-      console.error(`   ├─ ❌ Error checking table ${tableName}:`, error)
+      console.error(`   ├─ ❌ Error checking/creating table ${tableName}:`, error)
       throw error
     }
   }
