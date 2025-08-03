@@ -104,9 +104,3 @@ The agent successfully handles both required test queries:
 - Handles Popular Albums → popular_albums table + API
 - Creates routes → /api/made-for-you and /api/popular-albums
 - Frontend fetches from real database
-
-
-
-Built for the **Orchids Full Stack SWE Takehome** challenge 🌺
-
-
