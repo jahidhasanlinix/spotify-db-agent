@@ -15,7 +15,6 @@ A Next.js Spotify clone featuring an AI-powered database agent that can process 
 
 - **Frontend**: Next.js 15, React 19, TypeScript, Tailwind CSS
 - **Database**: SQLite with Drizzle ORM
-- **LLM**:  gemini-2.5-flash-lite-preview-06-17
 - **CLI**: Commander.js, Inquirer.js
 
 ## 📋 Setup Instructions
